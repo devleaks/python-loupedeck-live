@@ -9,9 +9,9 @@ devices = LoupedeckLive.list()
 
 print(devices)
 
+def callback(msg):
+    print(f"received {msg}")
+
 l = LoupedeckLive(path=devices[1], baudrate=256000, timeout=1)
-
-l.init()
-
-time.sleep(2)
-l.getInfo()
+l.set_callback(callback)
+l.start()

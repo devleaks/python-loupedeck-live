@@ -1,3 +1,15 @@
+# Application constants
+
+BIG_ENDIAN = "big"
+WS_UPGRADE_HEADER = b"""GET /index.html
+HTTP/1.1
+Connection: Upgrade
+Upgrade: websocket
+Sec-WebSocket-Key: 123abc
+
+"""
+WS_UPGRADE_RESPONSE = 'HTTP/1.1'
+
 # Various constants used by the Loupedeck firmware
 
 BUTTONS = {
