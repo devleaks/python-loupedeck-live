@@ -37,6 +37,7 @@ class Loupedeck:
         self.version = None
         self.inited = False
         self.running = False
+        self.path = None
 
         self._buffer = bytearray(b"")
         self._messages = Queue()
@@ -79,7 +80,8 @@ class Loupedeck:
         if self.inited:
             return {
                 "version": self.version,
-                "serial": self.serial
+                "serial": self.serial,
+                "path": self.path
             }
         return None
 
@@ -89,6 +91,7 @@ class LoupedeckLive(Loupedeck):
     def __init__(self, path:str, baudrate:int, timeout:int):
         Loupedeck.__init__(self)
 
+        self.path = path
         self.connection = serial.Serial(port=path, baudrate=baudrate, timeout=timeout)
         self.reading_thread = None  # read
         self.process_thread = None  # messages
@@ -116,7 +119,7 @@ class LoupedeckLive(Loupedeck):
         self.send(WS_UPGRADE_HEADER, raw=True)
         while True and not self.inited:
             raw_byte = self.connection.readline()
-            print(raw_byte)
+            logger.debug(raw_byte)
             if raw_byte == b"\r\n":  # got WS_UPGRADE_RESPONSE
                 self.inited = True
             time.sleep(0.1)
@@ -124,6 +127,7 @@ class LoupedeckLive(Loupedeck):
 
     def info(self):
         if self.connection is not None:
+            logger.info(f"Device: {self.path}")
             self.do_action(HEADERS["SERIAL_OUT"], track=True)
             self.do_action(HEADERS["VERSION_OUT"], track=True)
 
@@ -269,7 +273,8 @@ class LoupedeckLive(Loupedeck):
     # Callbacks
     #
     def do_action(self, action, data:bytearray = None, track:bool = False):
-        if self.connection is None:
+        if not self.inited:
+            logger.debug(f"do_action: not started")
             return
 
         if data is not None and type(data) != bytearray and type(data) != bytes:
@@ -289,40 +294,40 @@ class LoupedeckLive(Loupedeck):
 
         if track:
             logger.debug(f"do_action: tracking {self.transaction_id}")
-            self.pendingTransactions[self.transaction_id] = self.on_default_callback
+            self.pendingTransactions[self.transaction_id] = action
         self.send(payload)
 
-    def on_serial(self, serial):
-        self.serial = serial.strip()
+    def on_serial(self, serial:bytearray):
+        self.serial = serial.decode("ascii").strip()
         logger.info(f"Serial number: {self.serial}")
 
-    def on_version(self, version):
+    def on_version(self, version:bytearray):
         self.version = f"{version[0]}.{version[1]}.{version[2]}"
         logger.info(f"Version: {self.version}")
 
-    def on_button(self, buff):
+    def on_button(self, buff:bytearray):
         idx = BUTTONS[buff[0]]
         event = 'down' if buff[1] == 0x00 else 'up'
         if self.callback:
             self.callback({
-                "type": "button",
-                "idx": idx,
+                "id": idx,
+                "action": "push",
                 "state": event
             })
         logger.debug(f"on_button: {idx}, {event}")
 
-    def on_rotate(self, buff):
+    def on_rotate(self, buff:bytearray):
         idx = BUTTONS[buff[0]]
         event = "right" if buff[1] == 0x01 else "left"
         if self.callback:
             self.callback({
-                "type": "rotate",
-                "idx": idx,
+                "id": idx,
+                "action": "rotate",
                 "state": event
             })
         logger.debug(f"on_rotate: {idx}, {event}")
 
-    def on_touch(self, buff, event="touchmove"):
+    def on_touch(self, buff:bytearray, event="touchmove"):
         x = int.from_bytes(buff[1:3], BIG_ENDIAN)
         y = int.from_bytes(buff[3:5], BIG_ENDIAN)
         idx = buff[5]
@@ -342,16 +347,16 @@ class LoupedeckLive(Loupedeck):
 
         # Create touch
         touch = {
-            "x": x,
-            "y": y,
-            "idx": idx,
+            "id": idx,
+            "action": event,
             "screen": screen,
             "key": key,
-            "type": event
+            "x": x,
+            "y": y
         }
         if event == "touchmove":
             if idx not in self.touches:
-                touch["type"] = "touchstart"
+                touch["action"] = "touchstart"
                 self.touches[idx] = touch
         else:
             del self.touches[idx]
@@ -360,13 +365,13 @@ class LoupedeckLive(Loupedeck):
             self.callback(touch)
         logger.debug(f"on_touch: {event}, {buff}")
 
-    def on_touch_end(self, buff):
+    def on_touch_end(self, buff:bytearray):
         self.on_touch(buff, event="touchend")
 
-    def on_tick(self, buff):
+    def on_tick(self, buff:bytearray):
         logger.debug(f"on_tick: {buff}")
 
-    def on_default_callback(self, transaction_id: int, response):
+    def on_default_callback(self, transaction_id: int, response:bytearray):
         logger.debug(f"{transaction_id}: {response}")
         self.pendingTransactions[transaction_id] = None
 
@@ -417,7 +422,7 @@ class LoupedeckLive(Loupedeck):
     def refresh(self, display:int):
         display_info = DISPLAYS[display]
         self.do_action(HEADERS["DRAW"], display_info["id"], track=True)
-        logger.error("refresh: refreshed")
+        logger.debug("refresh: refreshed")
 
     def draw_buffer(self, buff, display:str, width: int = None, height: int = None, x:int = 0, y:int = 0, auto_refresh:bool = True):
         display_info = DISPLAYS[display]
@@ -437,7 +442,7 @@ class LoupedeckLive(Loupedeck):
         header = header + height.to_bytes(2, BIG_ENDIAN)
         payload = display_info["id"] + header + buff
         self.do_action(HEADERS["WRITE_FRAMEBUFF"], payload, track=True)
-        logger.error(f"draw_buffer: buffer sent {len(buff)} bytes")
+        logger.debug(f"draw_buffer: buffer sent {len(buff)} bytes")
         if auto_refresh:
             self.refresh(display)
 
@@ -493,13 +498,11 @@ class LoupedeckLive(Loupedeck):
         else: # type(image) == PIL.Image.Image
             self.draw_image(image, display="center", width=width, height=height, x=x, y=y, auto_refresh=True)
 
-
     def test_image(self):
         # image = Image.new("RGBA", (360, 270), "cyan")
-        with open("yumi.jpg", "rb") as infile:
+        with open("airportspage.png", "rb") as infile:
             image = Image.open(infile).convert("RGBA")
             self.draw_image(image, display="center")
         image2 = Image.new("RGBA", (90, 90), "blue")
         self.set_key_image(6, image2)
-
 
