@@ -12,32 +12,16 @@ WS_UPGRADE_RESPONSE = 'HTTP/1.1'
 
 # Various constants used by the Loupedeck firmware
 
-BUTTONS = {
-    0x01: 'knobTL',
-    0x02: 'knobCL',
-    0x03: 'knobBL',
-    0x04: 'knobTR',
-    0x05: 'knobCR',
-    0x06: 'knobBR',
-    0x07: 'circle',
-    0x08: '1',
-    0x09: '2',
-    0x0a: '3',
-    0x0b: '4',
-    0x0c: '5',
-    0x0d: '6',
-    0x0e: '7'
-}
+# Maximum brightness value
+MAX_BRIGHTNESS = 10
+
+# How long until trying to reconnect after a disconnect
+RECONNECT_INTERVAL = 3000
 
 # How long without ticks until a connection is considered "timed out"
 CONNECTION_TIMEOUT = 3000
 
-DISPLAYS = {
-    "center": { "id": bytes('\x00A'.encode("ascii")), "width": 360, "height": 270 }, # "A"
-    "left":   { "id": bytes('\x00L'.encode("ascii")), "width": 60,  "height": 270 }, # "L"
-    "right":  { "id": bytes('\x00R'.encode("ascii")), "width": 60,  "height": 270 }, # "R"
-}
-
+# Actions and response identifications
 HEADERS = {
     "CONFIRM": 0x0302,
     "SERIAL_OUT": 0x0303,
@@ -59,6 +43,32 @@ HEADERS = {
     "WRITE_FRAMEBUFF": 0xff10
 }
 
+# Button names
+BUTTONS = {
+    0x01: 'knobTL',
+    0x02: 'knobCL',
+    0x03: 'knobBL',
+    0x04: 'knobTR',
+    0x05: 'knobCR',
+    0x06: 'knobBR',
+    0x07: 'circle',
+    0x08: '1',
+    0x09: '2',
+    0x0a: '3',
+    0x0b: '4',
+    0x0c: '5',
+    0x0d: '6',
+    0x0e: '7'
+}
+
+# Displays
+DISPLAYS = {
+    "center": { "id": bytes('\x00A'.encode("ascii")), "width": 360, "height": 270 }, # "A"
+    "left":   { "id": bytes('\x00L'.encode("ascii")), "width": 60,  "height": 270 }, # "L"
+    "right":  { "id": bytes('\x00R'.encode("ascii")), "width": 60,  "height": 270 }, # "R"
+}
+
+# Haptic feedbacks
 HAPTIC = {
     "SHORT": 0x01,
     "MEDIUM": 0x0a,
@@ -89,9 +99,3 @@ HAPTIC = {
     "RUMBLE1": 0x7b,
     "VERY_LONG": 0x76, # 10 sec high freq (!)
 }
-
-# Maximum brightness value
-MAX_BRIGHTNESS = 10
-
-# How long until trying to reconnect after a disconnect
-RECONNECT_INTERVAL = 3000

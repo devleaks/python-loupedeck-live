@@ -1,17 +1,16 @@
 """
 Main Loupedeck and LoupedeckLive classes.
-
 """
 import glob
 import io
 import logging
 import math
-import serial
 import sys
 import threading
 import time
 from queue import Queue
 
+import serial
 from PIL import Image, ImageColor
 
 from constants import BIG_ENDIAN, WS_UPGRADE_HEADER, WS_UPGRADE_RESPONSE
@@ -87,14 +86,15 @@ class Loupedeck:
 
 class LoupedeckLive(Loupedeck):
 
-
     def __init__(self, path:str, baudrate:int, timeout:int):
         Loupedeck.__init__(self)
 
         self.path = path
         self.connection = serial.Serial(port=path, baudrate=baudrate, timeout=timeout)
         self.reading_thread = None  # read
+        self.reading_thread_wait = 0.2
         self.process_thread = None  # messages
+        self.process_thread_wait = 0.2
         self.touches = {}
 
         self.handlers = {
@@ -130,18 +130,6 @@ class LoupedeckLive(Loupedeck):
             logger.info(f"Device: {self.path}")
             self.do_action(HEADERS["SERIAL_OUT"], track=True)
             self.do_action(HEADERS["VERSION_OUT"], track=True)
-
-    def test(self):
-        self.vibrate("ASCEND_MED")
-        self.set_brightness(5)
-        self.set_button_color("1", "red")
-        # self.set_button_color("2", "orange")
-        # self.set_button_color("3", "yellow")
-        # self.set_button_color("4", "green")
-        # self.set_button_color("5", "blue")
-        # self.set_button_color("6", "purple")
-        # self.set_button_color("7", "white")
-        self.test_image()
 
     # #########################################@
     # Serial Connection
@@ -264,8 +252,6 @@ class LoupedeckLive(Loupedeck):
                 except:
                     logger.error(f"_process_messages: exception:", exc_info=1)
                     logger.error(f"_process_messages: continuing")
-
-            time.sleep(1)
 
         logger.debug("_process_messages: terminated")
 
@@ -498,11 +484,50 @@ class LoupedeckLive(Loupedeck):
         else: # type(image) == PIL.Image.Image
             self.draw_image(image, display="center", width=width, height=height, x=x, y=y, auto_refresh=True)
 
+    # #########################################@
+    # Development and testing
+    #
+    def test(self):
+        self.vibrate("REV_FAST")
+        time.sleep(1)
+        self.vibrate("LOW")
+        time.sleep(1)
+        self.vibrate("LONG")
+        self.set_brightness(5)
+        self.set_button_color("1", "red")
+        # self.set_button_color("2", "orange")
+        # self.set_button_color("3", "yellow")
+        # self.set_button_color("4", "green")
+        # self.set_button_color("5", "blue")
+        # self.set_button_color("6", "purple")
+        # self.set_button_color("7", "white")
+        self.test_image()
+
     def test_image(self):
         # image = Image.new("RGBA", (360, 270), "cyan")
-        with open("airportspage.png", "rb") as infile:
+        with open("yumi.jpg", "rb") as infile:
             image = Image.open(infile).convert("RGBA")
             self.draw_image(image, display="center")
-        image2 = Image.new("RGBA", (90, 90), "blue")
-        self.set_key_image(6, image2)
+        with open("left.jpg", "rb") as infile:
+            image = Image.open(infile).convert("RGBA")
+            self.draw_image(image, display="left")
+        with open("right.jpg", "rb") as infile:
+            image = Image.open(infile).convert("RGBA")
+            self.draw_image(image, display="right")
+        # image2 = Image.new("RGBA", (90, 90), "blue")
+        # self.set_key_image(6, image2)
 
+
+if __name__ == "__main__":
+    logging.basicConfig(level=logging.INFO)
+    devices = LoupedeckLive.list()
+    def callback(msg):
+        print(f"received {msg}")
+
+    l = LoupedeckLive(path=devices[1], baudrate=256000, timeout=1)
+    l.set_callback(callback)
+
+    l.start()
+    # test
+    # time.sleep(10)
+    # l.stop()
