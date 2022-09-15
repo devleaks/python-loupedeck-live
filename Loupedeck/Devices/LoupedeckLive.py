@@ -19,6 +19,7 @@ from .Loupedeck import Loupedeck
 
 from .constants import BIG_ENDIAN, WS_UPGRADE_HEADER, WS_UPGRADE_RESPONSE
 from .constants import HEADERS, BUTTONS, HAPTIC, MAX_BRIGHTNESS, DISPLAYS
+from .. import __NAME__, __version__
 
 logger = logging.getLogger("LoupedeckLive")
 
@@ -61,7 +62,6 @@ class LoupedeckLive(Loupedeck):
         self.init_ws()
         self.start()
         self.info()
-        self.test()
 
     def init_ws(self):
         self.send(WS_UPGRADE_HEADER, raw=True)
@@ -75,6 +75,7 @@ class LoupedeckLive(Loupedeck):
 
     def info(self):
         if self.connection is not None:
+            logger.info(f"{__NAME__}: {__version__}")
             logger.info(f"Device: {self.path}")
             self.do_action(HEADERS["SERIAL_OUT"], track=True)
             self.do_action(HEADERS["VERSION_OUT"], track=True)

@@ -13,9 +13,6 @@ def callback(msg):
 if len(devices) > 0:
     l = devices[0]
     l.set_callback(callback)
-
-    l.start()
-
-    # test
+    l.test()
     # time.sleep(10)
     # l.stop()
