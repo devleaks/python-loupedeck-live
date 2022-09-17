@@ -5,6 +5,7 @@ import glob
 import io
 import logging
 import math
+import os
 import serial
 import sys
 import threading
@@ -427,13 +428,14 @@ class LoupedeckLive(Loupedeck):
 
     def test_image(self):
         # image = Image.new("RGBA", (360, 270), "cyan")
-        with open("yumi.jpg", "rb") as infile:
+        basedir = os.path.join("Assets")
+        with open(os.path.join(basedir, "yumi.jpg"), "rb") as infile:
             image = Image.open(infile).convert("RGBA")
             self.draw_image(image, display="center")
-        with open("left.jpg", "rb") as infile:
+        with open(os.path.join(basedir, "left.jpg"), "rb") as infile:
             image = Image.open(infile).convert("RGBA")
             self.draw_image(image, display="left")
-        with open("right.jpg", "rb") as infile:
+        with open(os.path.join(basedir, "right.jpg"), "rb") as infile:
             image = Image.open(infile).convert("RGBA")
             self.draw_image(image, display="right")
         # image2 = Image.new("RGBA", (90, 90), "blue")
