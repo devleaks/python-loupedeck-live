@@ -14,5 +14,5 @@ if len(devices) > 0:
     l = devices[0]
     l.set_callback(callback)
     l.test()
-    # time.sleep(10)
-    # l.stop()
+    time.sleep(5)
+    l.stop()
