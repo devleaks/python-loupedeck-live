@@ -7,14 +7,17 @@ DISPLAYS = {
     "right":  { "id": bytes('\x00R'.encode("ascii")), "width": 60,  "height": 270 }, # "R"
 }
 
-def get_dimentions(deck):
+def get_dimentions(display):
     width = 90
     height = 90
-    if deck in DISPLAYS.keys():
-        width = DISPLAYS[deck]["width"]
-        height = DISPLAYS[deck]["height"]
-    elif deck != "button":
-        print(f"invalid deck '{deck}', assuming button size")
+    if display in DISPLAYS.keys():
+        width = DISPLAYS[display]["width"]
+        height = DISPLAYS[display]["height"]
+    elif display == "full":
+        width = DISPLAYS["left"]["width"] + DISPLAYS["center"]["width"] + DISPLAYS["right"]["width"]
+        height = DISPLAYS["left"]["height"] + DISPLAYS["center"]["height"] + DISPLAYS["right"]["height"]
+    elif display != "button":
+        print(f"PILHelper::get_dimentions: invalid deck '{display}', assuming button size")
     return (width, height)
 
 
@@ -34,8 +37,6 @@ def create_image(deck, background='black'):
     :return: Created PIL image
     """
     from PIL import Image
-
-    image_format = deck.key_image_format()
 
     return Image.new("RGB", get_dimentions(deck), background)
 
