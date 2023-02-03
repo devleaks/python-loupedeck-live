@@ -20,6 +20,7 @@ logger = logging.getLogger("LoupedeckLive")
 
 MAX_TRANSACTIONS = 256
 READING_TIMEOUT = 1  # seconds
+BAUD_RATE = 460800
 
 
 def print_bytes(buff, begin: int = 18, end: int = 10):
@@ -32,7 +33,7 @@ def print_bytes(buff, begin: int = 18, end: int = 10):
 
 class LoupedeckLive(Loupedeck):
 
-    def __init__(self, path: str, baudrate: int = 460800, timeout: int = READING_TIMEOUT, auto_start: bool = True):
+    def __init__(self, path: str, baudrate: int = BAUD_RATE, timeout: int = READING_TIMEOUT, auto_start: bool = True):
         Loupedeck.__init__(self)
 
         self.path = path
@@ -60,6 +61,9 @@ class LoupedeckLive(Loupedeck):
         }
 
         self.get_timeout = 1  # seconds
+
+        if not self.is_loupedeck():
+            return None
 
         self.init()
 
@@ -92,19 +96,9 @@ class LoupedeckLive(Loupedeck):
         }
 
     def init(self):
-        self.init_ws()
-        if self.auto_start:
-            self.start()
-            self.info()  # this is more to test it is working...
-
-    def init_ws(self):
-        self.send(WS_UPGRADE_HEADER, raw=True)
-        while True and not self.inited:
-            raw_byte = self.connection.readline()
-            logger.debug(raw_byte)
-            if raw_byte == b"\r\n":  # got entire WS_UPGRADE_RESPONSE
-                self.inited = True
-        logger.debug(f"init_ws: inited")
+        self.start()
+        self.info()  # this is more to test it is working...
+        logger.debug(f"init: inited")
 
     def info(self):
         if self.connection is not None:
@@ -130,39 +124,6 @@ class LoupedeckLive(Loupedeck):
         if big:
             return ["left", "center", "right"]
         return ["left", "right"] + list(range(self.key_count()))
-
-    # #########################################@
-    # Serial Connection
-    #
-    def send(self, buff, raw=False):
-        """
-        Send buffer to device
-
-        :param      buffer:  The buffer
-        :type       buffer:  { type_description }
-        """
-        # logger.debug(f"send: to send: len={len(buff)}, raw={raw}, {print_bytes(buff)}")
-        if not raw:
-            prep = None
-            if len(buff) > 0x80:
-                prep = bytearray(14)
-                prep[0] = 0x82
-                prep[1] = 0xff
-                buff_len = len(buff)
-                prep[6:10] = buff_len.to_bytes(4, BIG_ENDIAN)
-            else:
-                prep = bytearray(6)
-                prep[0] = 0x82
-                prep[1] = 0x80 + len(buff)
-                # prep.insert(2, buff_length.to_bytes(4, "big", False))
-            # logger.debug(f"send: PREP: len={len(buff)}: {prep}")
-            with self:
-                self.connection.write(prep)
-                self.connection.write(buff)
-        else:
-            with self:
-                # logger.debug(f"send: buff: len={len(buff)}, {print_bytes(buff)}") # {buff},
-                self.connection.write(buff)
 
     # #########################################@
     # Threading

@@ -34,10 +34,13 @@ class DeviceManager:
         result = []
         for port in ports:
             try:
+                logger.debug(f"trying {port}..")
                 s = serial.Serial(port)
                 s.close()
                 result.append(port)
+                logger.debug(f"..added {port}")
             except (OSError, serial.SerialException):
+                logger.debug(f".. not added {port}", exc_info=True)
                 pass
         return result
 
@@ -48,9 +51,10 @@ class DeviceManager:
         loupedecks = list()
 
         paths = DeviceManager.list()
-        # @todo: List loupedeck live devices only
-        for path in paths[1:]:
+        for path in paths:
             l = LoupedeckLive(path=path)
-            loupedecks.append(l)
+            if l.is_loupedeck():
+                logger.debug(f"added Loupedeck at {path}")
+                loupedecks.append(l)
 
         return loupedecks
