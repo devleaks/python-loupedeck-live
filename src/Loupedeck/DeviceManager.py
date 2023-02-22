@@ -8,7 +8,7 @@ import sys
 from .Devices import LoupedeckLive
 
 logger = logging.getLogger("DeviceManager")
-
+VERBOSE = False
 
 class DeviceManager:
 
@@ -31,6 +31,7 @@ class DeviceManager:
         else:
             raise EnvironmentError("Unsupported platform")
 
+        logger.debug(f"list: listing ports..")
         result = []
         for port in ports:
             try:
@@ -40,8 +41,8 @@ class DeviceManager:
                 result.append(port)
                 logger.debug(f"..added {port}")
             except (OSError, serial.SerialException):
-                logger.debug(f".. not added {port}", exc_info=True)
-                pass
+                logger.debug(f".. not added {port}", exc_info=VERBOSE)
+        logger.debug(f"list: ..listed")
         return result
 
     def __init__(self):
@@ -54,7 +55,7 @@ class DeviceManager:
         for path in paths:
             l = LoupedeckLive(path=path)
             if l.is_loupedeck():
-                logger.debug(f"added Loupedeck at {path}")
+                logger.debug(f"enumerate: added Loupedeck device at {path}")
                 loupedecks.append(l)
 
         return loupedecks

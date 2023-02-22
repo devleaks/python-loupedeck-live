@@ -5,14 +5,14 @@ import logging
 import threading
 from queue import Queue
 
-from .constants import BIG_ENDIAN, WS_UPGRADE_HEADER
+from .constants import BIG_ENDIAN, WS_UPGRADE_HEADER, WS_UPGRADE_RESPONSE
 
 logger = logging.getLogger("Loupedeck")
 
 
-NUM_ATTEMPTS = 2
-READING_TIMEOUT = 1  # seconds
-BAUD_RATE = 460800
+NUM_ATTEMPTS = 1        # + 1 mandatory
+READING_TIMEOUT = 0.5   # seconds
+BAUD_RATE = 460800      # Max for HIDAPI
 
 
 class Loupedeck:
@@ -58,6 +58,10 @@ class Loupedeck:
         """
         self.update_lock.release()
 
+    def deck_type(self):
+        if self.inited:
+            return "loupedeck" if self._is_loupedeck else "unknown"
+
     def is_loupedeck(self) -> bool:
         cnt = 0
         if self.inited:
@@ -73,19 +77,23 @@ class Loupedeck:
         # b'\r\n'
         #
         # We only check fot the last line
+        good = 0
         logger.debug(f"is_loupedeck: {self.path}: trying..")
-        while not self.inited:
+        while not self.inited and good < len(WS_UPGRADE_RESPONSE):
             raw_byte = self.connection.readline()
             logger.debug(f"is_loupedeck: {raw_byte}")
-            if raw_byte == b"\r\n":  # got entire WS_UPGRADE_RESPONSE
-                logger.debug(f"is_loupedeck: {self.path}: ..got a {type(self).__name__} device")
-                self.inited = True
-                self._is_loupedeck = True
+            if raw_byte in WS_UPGRADE_RESPONSE:  # got entire WS_UPGRADE_RESPONSE
+                good = good + 1
             if raw_byte == b'':
                 cnt = cnt + 1
             if cnt > NUM_ATTEMPTS:
                 logger.debug(f"is_loupedeck: {self.path}: ..got {cnt} wrong answers, probably not a {type(self).__name__} device, ignoring.")
                 self.inited = True
+        if good == len(WS_UPGRADE_RESPONSE):  # not 100% correct, but ok.
+            logger.debug(f"is_loupedeck: {self.path}: ..got a {type(self).__name__} device")
+            self.inited = True
+            self._is_loupedeck = True
+
         return self._is_loupedeck
 
     def get_info(self):
