@@ -11,3 +11,4 @@ __authorurl__ = "https://devleaks.be/"
 
 
 from .DeviceManager import DeviceManager
+from .Devices import HAPTIC

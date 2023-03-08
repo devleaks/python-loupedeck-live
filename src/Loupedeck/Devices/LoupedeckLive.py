@@ -182,13 +182,6 @@ class LoupedeckLive(Loupedeck):
                 logger.error(f"_read_serial: resuming")
 
         self.reading_running = False
-
-        if self.reading_finished is not None:
-            self.reading_finished.set()
-            logger.debug(f"_read_serial: reading_finished set")
-        else:
-            logger.warning(f"_read_serial: no event set")
-
         logger.debug("_read_serial: terminated")
 
     def _process_messages(self):
@@ -222,13 +215,6 @@ class LoupedeckLive(Loupedeck):
         logger.debug("_process_messages: no longer running")
 
         self.process_running = False
-
-        if self.process_finished is not None:
-            self.process_finished.set()
-            logger.debug(f"_process_messages: process_finished set")
-        else:
-            logger.warning(f"_process_messages: no event set")
-
         logger.debug("_process_messages: terminated")
 
     def start(self):
@@ -254,18 +240,26 @@ class LoupedeckLive(Loupedeck):
             logger.warning("start: cannot start, not initialized")
 
     def stop(self):
-        self.reading_finished = threading.Event()
-        self.process_finished = threading.Event()
-        self.reading_running = False
-        self.process_running = False
-        logger.info("stop: requested threads to stop, waiting..")
-        # self._messages.put("__STOP__")
-        if not self.reading_finished.wait(timeout=2 * READING_TIMEOUT):  # sloppy but ok.
-            logger.warning("stop: reader thread did not finish cleanly")
-        if not self.process_finished.wait(timeout=2 * self.get_timeout):
-            logger.warning("stop: reader thread did not finish cleanly")
+        done = False
+        if self.reading_running:
+            self.reading_running = False
+            self.reading_thread.join(timeout=2 * READING_TIMEOUT)
+            done = True
+            if self.reading_thread.is_alive():
+                # self.reading_running = True  # ??
+                logger.warning("stop: reader thread did not finish cleanly")
 
-        logger.info("stop: ..stopped")
+        if self.process_running:
+            self.process_running = False
+            self.process_thread.join(timeout=2 * self.get_timeout)
+            done = True
+            if self.process_thread.is_alive():
+                # self.process_running = True  # ??
+                logger.warning("stop: process thread did not finish cleanly")
+        if done:
+            logger.info("stop: ..stopped")
+        else:
+            logger.info("stop: already stopped")
 
     # #########################################@
     # Callbacks
@@ -514,13 +508,11 @@ class LoupedeckLive(Loupedeck):
     # Development and testing
     #
     def test(self):
-        WAIT_TIME = 0.5
-        self.vibrate("REV_FAST")
-        time.sleep(WAIT_TIME)
-        self.vibrate("LOW")
-        time.sleep(WAIT_TIME)
-        self.vibrate("LONG")
-        time.sleep(WAIT_TIME)
+        WAIT_TIME = 3
+        for i in HAPTIC.keys():
+            self.vibrate(i)
+            print(i)
+            time.sleep(WAIT_TIME)
 
         for bright in range(0, 100, 10):
             time.sleep(0.2)
