@@ -2,23 +2,28 @@
 Loupedeck base class. Kind of ABC for future loupedeck devices.
 """
 import logging
-import threading
-from queue import Queue
+import serial
 
-from .constants import BIG_ENDIAN, WS_UPGRADE_HEADER, WS_UPGRADE_RESPONSE
+from threading import RLock
+
+from .constants import BAUD_RATE, READING_TIMEOUT, BIG_ENDIAN, WS_UPGRADE_HEADER, WS_UPGRADE_RESPONSE
 
 logger = logging.getLogger("Loupedeck")
+# logger.setLevel(logging.DEBUG)
 
 
-NUM_ATTEMPTS = 1        # + 1 mandatory
-READING_TIMEOUT = 0.5   # seconds
-BAUD_RATE = 460800      # Max for HIDAPI
+NUM_ATTEMPTS = 1  # + 1 mandatory
 
 
 class Loupedeck:
 
-    def __init__(self):
-        self.connection = None
+    def __init__(self, path: str, baudrate: int = BAUD_RATE, timeout: int = READING_TIMEOUT):
+
+        self.path = path
+        # See https://lucidar.me/en/serialib/most-used-baud-rates-table/ for baudrates
+        self.connection = serial.Serial(port=path, baudrate=baudrate, timeout=timeout)
+        logger.debug(f"__init__: connection opened")
+
         self.serial = None
         self.version = None
         self.inited = False
@@ -26,7 +31,6 @@ class Loupedeck:
         self.path = None
 
         self._buffer = bytearray(b"")
-        self._messages = Queue()
         self._is_loupedeck = False
 
         self.pendingTransactions = [None for _ in range(256)]
@@ -34,13 +38,21 @@ class Loupedeck:
 
         self.callback = None
 
-        self.update_lock = threading.RLock()
+        self.update_lock = RLock()
 
     def __del__(self):
+        """
+        Delete handler for the automatically closing the serial port.
+        """
         try:
-            self.connection.close()
+            if self.connection is not None:
+                if self.connection.is_open:
+                    self.connection.close()
+                    logger.debug(f"__del__: connection closed")
+                del self.connection  # calls self.connection.close()
+                self.connection = None
         except:
-            pass
+            logger.error(f"__del__: exception:", exc_info=1)
 
     def __enter__(self):
         """
@@ -63,21 +75,17 @@ class Loupedeck:
             return "loupedeck" if self._is_loupedeck else "unknown"
 
     def is_loupedeck(self) -> bool:
-        cnt = 0
+        global NUM_ATTEMPTS
+
         if self.inited:
             return self._is_loupedeck
 
         self.send(WS_UPGRADE_HEADER, raw=True)
-        # The whole answer is:
-        #
-        # b'HTTP/1.1 101 Switching Protocols\r\n'
-        # b'Upgrade: websocket\r\n'
-        # b'Connection: Upgrade\r\n'
-        # b'Sec-WebSocket-Accept: ALtlZo9FMEUEQleXJmq++ukUQ1s=\r\n'
-        # b'\r\n'
-        #
-        # We only check fot the last line
+
+        cnt = 0
         good = 0
+        if NUM_ATTEMPTS < 1:
+            NUM_ATTEMPTS = 1
         logger.debug(f"is_loupedeck: {self.path}: trying..")
         while not self.inited and good < len(WS_UPGRADE_RESPONSE):
             raw_byte = self.connection.readline()

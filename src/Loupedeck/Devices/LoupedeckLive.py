@@ -5,41 +5,28 @@ import logging
 import math
 import threading
 import time
-from datetime import datetime
 
-import serial
+from queue import Queue
+from datetime import datetime
 from PIL import Image, ImageColor
 
 from .Loupedeck import Loupedeck
-from .constants import BIG_ENDIAN, WS_UPGRADE_HEADER
+from .constants import BAUD_RATE, READING_TIMEOUT, BIG_ENDIAN, WS_UPGRADE_HEADER
 from .constants import HEADERS, BUTTONS, HAPTIC, MAX_BRIGHTNESS, DISPLAYS, BUTTON_SIZES
 from ..ImageHelpers import PILHelper
 
 logger = logging.getLogger("LoupedeckLive")
 # logger.setLevel(logging.DEBUG)
 
+
 MAX_TRANSACTIONS = 256
-READING_TIMEOUT = 1  # seconds
-BAUD_RATE = 460800
-
-
-def print_bytes(buff, begin: int = 18, end: int = 10):
-    if buff is None:
-        return None
-    if len(buff) > 20:
-        return f"{buff[0:begin]} ... {buff[-end:]}"
-    return f"{buff}"
 
 
 class LoupedeckLive(Loupedeck):
 
     def __init__(self, path: str, baudrate: int = BAUD_RATE, timeout: int = READING_TIMEOUT, auto_start: bool = True):
-        Loupedeck.__init__(self)
+        Loupedeck.__init__(self, path=path, baudrate=baudrate, timeout=timeout)
 
-        self.path = path
-        # See https://lucidar.me/en/serialib/most-used-baud-rates-table/ for baudrates
-        self.connection = serial.Serial(port=path, baudrate=baudrate, timeout=timeout)
-        logger.debug(f"__init__: connection opened")
         self.auto_start = auto_start
         self.reading_thread = None  # read
         self.process_thread = None  # messages
@@ -60,23 +47,13 @@ class LoupedeckLive(Loupedeck):
             HEADERS["VERSION_IN"]: self.on_version
         }
 
-        self.get_timeout = 1  # seconds
+        self._messages = Queue()
+        self.get_timeout = 1  # Queue get() timeout, in seconds
 
         if not self.is_loupedeck():
             return None
 
         self.init()
-
-    def __del__(self):
-        """
-        Delete handler for the automatically closing the serial port.
-        """
-        try:
-            if self.connection is not None:
-                self.connection.close()
-                logger.debug(f"__del__: connection closed")
-        except:
-            logger.error(f"__del__: exception:", exc_info=1)
 
     def deck_type(self):
         if self.inited:
@@ -113,7 +90,7 @@ class LoupedeckLive(Loupedeck):
             if not self.get_serial.wait(10):
                 logger.debug(f"info: could not get serial number")
 
-            time.sleep(4 * self.get_timeout)  # give time to get answers
+            time.sleep(self.get_timeout)  # give time to get answers
 
     def id(self):
         return self.serial
@@ -212,9 +189,6 @@ class LoupedeckLive(Loupedeck):
                 pass
                 # logger.debug(f"_process_messages: timed out, continuing")
 
-        logger.debug("_process_messages: no longer running")
-
-        self.process_running = False
         logger.debug("_process_messages: terminated")
 
     def start(self):

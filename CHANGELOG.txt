@@ -1,0 +1,4 @@
+CHANGELOGS
+==========
+
+1.1.2: Ajusted some timeout parameters
