@@ -233,7 +233,7 @@ class LoupedeckLive(Loupedeck):
         if done:
             logger.info("stop: ..stopped")
         else:
-            logger.info("stop: already stopped")
+            logger.warning("stop: already stopped")
 
     # #########################################@
     # Callbacks

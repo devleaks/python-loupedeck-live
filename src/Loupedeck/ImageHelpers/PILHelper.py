@@ -7,9 +7,12 @@ DISPLAYS = {
     "right":  { "id": bytes('\x00R'.encode("ascii")), "width": 60,  "height": 270 }, # "R"
 }
 
-def get_dimentions(display):
+def get_dimensions(display):
     width = 90
     height = 90
+    if type(display) != str:
+        print(f"PILHelper::get_dimensions: invalid deck '{display}', assuming button size")
+        return (width, height)
     if display in DISPLAYS.keys():
         width = DISPLAYS[display]["width"]
         height = DISPLAYS[display]["height"]
@@ -17,11 +20,11 @@ def get_dimentions(display):
         width = DISPLAYS["left"]["width"] + DISPLAYS["center"]["width"] + DISPLAYS["right"]["width"]
         height = DISPLAYS["left"]["height"] + DISPLAYS["center"]["height"] + DISPLAYS["right"]["height"]
     elif display != "button":
-        print(f"PILHelper::get_dimentions: invalid deck '{display}', assuming button size")
+        print(f"PILHelper::get_dimensions: invalid deck '{display}', assuming button size")
     return (width, height)
 
 
-def create_image(deck, background='black'):
+def create_image(deck, background='black', display="button"):
     """
     Creates a new PIL Image with the correct image dimensions for the given
     StreamDeck device's keys.
@@ -30,18 +33,19 @@ def create_image(deck, background='black'):
                  PIL image instance to the native image format of a given
                  StreamDeck device.
 
-    :param StreamDeck deck: StreamDeck device to generate a compatible image for.
+    :param Loupedeck deck: Loupedeck device.
     :param str background: Background color to use, compatible with `PIL.Image.new()`.
+    :param str display: button name to generate a compatible image for.
 
     :rtype: PIL.Image
     :return: Created PIL image
     """
     from PIL import Image
 
-    return Image.new("RGB", get_dimentions(deck), background)
+    return Image.new("RGB", get_dimensions(display=display), background)
 
 
-def create_scaled_image(deck, image, margins=[0, 0, 0, 0], background='black'):
+def create_scaled_image(deck, image, margins=[0, 0, 0, 0], background='black', display="button"):
     """
     Creates a new key image that contains a scaled version of a given image,
     resized to best fit the given StreamDeck device's keys with the given
@@ -54,10 +58,10 @@ def create_scaled_image(deck, image, margins=[0, 0, 0, 0], background='black'):
                  PIL image instance to the native image format of a given
                  StreamDeck device.
 
-    :param StreamDeck deck: StreamDeck device to generate a compatible image for.
+    :param Loupedeck deck: Loupedeck device.
     :param Image image: PIL Image object to scale
-    :param list(int): Array of margin pixels in (top, right, bottom, left) order.
     :param str background: Background color to use, compatible with `PIL.Image.new()`.
+    :param str display: button name to generate a compatible image for.
 
     :rtrype: PIL.Image
     :return: Loaded PIL image scaled and centered
@@ -67,7 +71,7 @@ def create_scaled_image(deck, image, margins=[0, 0, 0, 0], background='black'):
     if len(margins) != 4:
         raise ValueError("Margins should be given as an array of four integers.")
 
-    final_image = create_image(deck, background=background)
+    final_image = create_image(deck, background=background, display=display)
 
     thumbnail_max_width = final_image.width - (margins[1] + margins[3])
     thumbnail_max_height = final_image.height - (margins[0] + margins[2])
