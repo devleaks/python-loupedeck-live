@@ -83,12 +83,12 @@ class LoupedeckLive(Loupedeck):
 
     def info(self):
         if self.connection is not None:
-            logger.info(f"Device: {self.path}")
+            logger.debug(f"Device: {self.path}")
             self.get_serial = threading.Event()
             self.do_action(HEADERS["SERIAL_OUT"], track=True)
             self.do_action(HEADERS["VERSION_OUT"], track=True)
             if not self.get_serial.wait(10):
-                logger.debug(f"info: could not get serial number")
+                logger.warning(f"info: could not get serial number")
 
             time.sleep(self.get_timeout)  # give time to get answers
 
@@ -231,7 +231,7 @@ class LoupedeckLive(Loupedeck):
                 # self.process_running = True  # ??
                 logger.warning("stop: process thread did not finish cleanly")
         if done:
-            logger.info("stop: ..stopped")
+            logger.debug("stop: stopped")
         else:
             logger.warning("stop: already stopped")
 
@@ -377,7 +377,7 @@ class LoupedeckLive(Loupedeck):
     def set_button_color(self, name: str, color: tuple or str):
         keys = list(filter(lambda k: BUTTONS[k] == name, BUTTONS))
         if len(keys) != 1:
-            logger.info(f"set_button_color: invalid button key {name}")
+            logger.warning(f"set_button_color: invalid button key {name}")
             return
         key = keys[0]
 
