@@ -1,5 +1,0 @@
-CHANGELOGS
-==========
-
-1.2.0: Modified PIL_Helper create_image, create_scaled_image for symmetry with Streamdeck
-1.1.2: Ajusted some timeout parameters

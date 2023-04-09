@@ -114,7 +114,7 @@ class LoupedeckLive(Loupedeck):
         def magic_byte_length_parser(chunk, magicByte=0x82):
             """
             Build local _buffer and scan it for complete messages.
-            Enqueue messages (responses) when reconstituted.
+            Enqueue complete messages (responses) when reconstituted.
 
             :param      chunk:      New chunk of data
             :type       chunk:      bytearray
@@ -159,10 +159,13 @@ class LoupedeckLive(Loupedeck):
                 logger.error(f"_read_serial: resuming")
 
         self.reading_running = False
+
         logger.debug("_read_serial: terminated")
 
     def _process_messages(self):
-
+        """
+        Dequeue messages, decode them, and call back closing open transactions if any.
+        """
         logger.debug("_process_messages: starting")
 
         while self.process_running:
@@ -176,8 +179,7 @@ class LoupedeckLive(Loupedeck):
                     transaction_id = buff[2]
                     # logger.debug(f"_process_messages: transaction_id {transaction_id}, header {header:x}")
                     response = handler(buff[3:]) if handler is not None else buff
-                    resolver = self.pendingTransactions[
-                        transaction_id] if transaction_id in self.pendingTransactions else None
+                    resolver = self.pendingTransactions[transaction_id] if transaction_id in self.pendingTransactions else None
                     if resolver is not None:
                         resolver(transaction_id, response)
                     else:
@@ -192,6 +194,9 @@ class LoupedeckLive(Loupedeck):
         logger.debug("_process_messages: terminated")
 
     def start(self):
+        """
+        Start both processes if not started.
+        """
         if self.inited:
             if not self.reading_running:
                 self.reading_thread = threading.Thread(target=self._read_serial)
@@ -214,6 +219,9 @@ class LoupedeckLive(Loupedeck):
             logger.warning("start: cannot start, not initialized")
 
     def stop(self):
+        """
+        Stop both processes
+        """
         done = False
         if self.reading_running:
             self.reading_running = False

@@ -15,7 +15,10 @@ setuptools.setup(
    url='https://github.com/devleaks/python-loupedeck-live',
    package_dir={'': 'src'},
    packages=setuptools.find_packages(where='src'),
-   install_requires=[],
+   install_requires=[
+      "pyserial==3.5",
+      "pillow>=9.5.0"
+   ],
    license="MIT",
    long_description=long_description,
    long_description_content_type="text/markdown",
