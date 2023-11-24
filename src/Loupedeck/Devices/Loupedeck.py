@@ -12,13 +12,13 @@ logger = logging.getLogger("Loupedeck")
 # logger.setLevel(logging.DEBUG)
 
 
+DEVICE_MANUFACTURER = "Loupedeck"  # verbose descriptive
+
 NUM_ATTEMPTS = 1  # + 1 mandatory
 
 
 class Loupedeck:
-
     def __init__(self, path: str, baudrate: int = BAUD_RATE, timeout: int = READING_TIMEOUT):
-
         self.path = path
         # See https://lucidar.me/en/serialib/most-used-baud-rates-table/ for baudrates
         self.connection = serial.Serial(port=path, baudrate=baudrate, timeout=timeout)
@@ -92,7 +92,7 @@ class Loupedeck:
             logger.debug(f"is_loupedeck: {raw_byte}")
             if raw_byte in WS_UPGRADE_RESPONSE:  # got entire WS_UPGRADE_RESPONSE
                 good = good + 1
-            if raw_byte == b'':
+            if raw_byte == b"":
                 cnt = cnt + 1
             if cnt > NUM_ATTEMPTS:
                 logger.debug(f"is_loupedeck: {self.path}: ..got {cnt} wrong answers, probably not a {type(self).__name__} device, ignoring.")
@@ -106,11 +106,7 @@ class Loupedeck:
 
     def get_info(self):
         if self.inited:
-            return {
-                "version": self.version,
-                "serial": self.serial,
-                "path": self.path
-            }
+            return {"version": self.version, "serial": self.serial, "path": self.path}
         return None
 
     def get_serial_number(self):
@@ -132,7 +128,7 @@ class Loupedeck:
             if len(buff) > 0x80:
                 prep = bytearray(14)
                 prep[0] = 0x82
-                prep[1] = 0xff
+                prep[1] = 0xFF
                 buff_len = len(buff)
                 prep[6:10] = buff_len.to_bytes(4, BIG_ENDIAN)
             else:

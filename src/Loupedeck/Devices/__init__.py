@@ -1,2 +1,1 @@
-from .LoupedeckLive import LoupedeckLive
-from .constants import HAPTIC
+from .LoupedeckLive import LoupedeckLive, HAPTIC
