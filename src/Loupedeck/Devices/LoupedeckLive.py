@@ -5,10 +5,12 @@ import logging
 import math
 import threading
 import time
+from enum import Enum
 
 from queue import Queue
 from datetime import datetime
 from PIL import Image, ImageColor
+from serial import XOFF
 
 from .Loupedeck import Loupedeck
 from .constants import BAUD_RATE, READING_TIMEOUT, BIG_ENDIAN
@@ -78,6 +80,24 @@ DISPLAYS = {
 DISPLAY_NAMES = set(DISPLAYS.keys())
 
 BUTTON_SIZES = {KW_CENTER: [90, 90], KW_LEFT: [60, 270], KW_RIGHT: [60, 270]}
+
+
+class CALLBACK_KEYWORD(Enum):
+    ACTION = "action"
+    KEY = "key"
+    IDENTIFIER = "id"
+    PUSH = "push"
+    ROTATE = "rotate"
+    SCREEN = "screen"
+    STATE = "state"
+    SWIPE = "swipe"
+    TIMESTAMP = "ts"
+    TOUCH_END = "touchend"
+    TOUCH_MOVE = "touchmove"
+    TOUCH_START = "touchstart"
+    X = "x"
+    Y = "y"
+
 
 # Haptic feedbacks
 HAPTIC = {
@@ -371,17 +391,33 @@ class LoupedeckLive(Loupedeck):
         idx = BUTTONS[buff[0]]
         event = "down" if buff[1] == 0x00 else "up"
         if self.callback:
-            self.callback(self, {"id": idx, "action": "push", "state": event, "ts": datetime.now().timestamp()})
+            self.callback(
+                self,
+                {
+                    CALLBACK_KEYWORD.IDENTIFIER.value: idx,
+                    CALLBACK_KEYWORD.ACTION.value: CALLBACK_KEYWORD.PUSH.value,
+                    CALLBACK_KEYWORD.STATE.value: event,
+                    CALLBACK_KEYWORD.TIMESTAMP.value: datetime.now().timestamp(),
+                },
+            )
         # logger.debug(f"on_button: {idx}, {event}")
 
     def on_rotate(self, buff: bytearray):
         idx = BUTTONS[buff[0]]
         event = KW_RIGHT if buff[1] == 0x01 else KW_LEFT
         if self.callback:
-            self.callback(self, {"id": idx, "action": "rotate", "state": event, "ts": datetime.now().timestamp()})
+            self.callback(
+                self,
+                {
+                    CALLBACK_KEYWORD.IDENTIFIER.value: idx,
+                    CALLBACK_KEYWORD.ACTION.value: CALLBACK_KEYWORD.ROTATE.value,
+                    CALLBACK_KEYWORD.STATE.value: event,
+                    CALLBACK_KEYWORD.TIMESTAMP.value: datetime.now().timestamp(),
+                },
+            )
         # logger.debug(f"on_rotate: {idx}, {event}")
 
-    def on_touch(self, buff: bytearray, event="touchmove"):
+    def on_touch(self, buff: bytearray, event=CALLBACK_KEYWORD.TOUCH_MOVE.value):
         x = int.from_bytes(buff[1:3], BIG_ENDIAN)
         y = int.from_bytes(buff[3:5], BIG_ENDIAN)
         idx = buff[5]
@@ -400,7 +436,15 @@ class LoupedeckLive(Loupedeck):
             key = row * 4 + column
 
         # Create touch
-        touch = {"id": idx, "action": event, "screen": screen, "key": key, "x": x, "y": y, "ts": datetime.now().timestamp()}
+        touch = {
+            CALLBACK_KEYWORD.IDENTIFIER.value: idx,
+            CALLBACK_KEYWORD.ACTION.value: event,
+            CALLBACK_KEYWORD.SCREEN.value: screen,
+            CALLBACK_KEYWORD.KEY.value: key,
+            CALLBACK_KEYWORD.X.value: x,
+            CALLBACK_KEYWORD.Y.value: y,
+            CALLBACK_KEYWORD.TIMESTAMP.value: datetime.now().timestamp(),
+        }
         if event == "touchmove":
             if idx not in self.touches:
                 touch["action"] = "touchstart"

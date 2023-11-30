@@ -1,6 +1,7 @@
 CHANGELOGS
 ==========
 
+  - 1.3.4: Use constant and enum rather than strings
   - 1.3.0: Adjusted setup.py for requirements
   - 1.2.2: Code cleanup
   - 1.2.1: Removed info() output
