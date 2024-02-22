@@ -70,11 +70,12 @@ KW_CENTER = "center"
 KW_WIDTH = "width"
 KW_HEIGHT = "height"
 KW_CIRCLE = "circle"
+KW_OFFSET = "offset"
 
 DISPLAYS = {
-    KW_CENTER: {"id": bytes("\x00A".encode("ascii")), KW_WIDTH: 360, KW_HEIGHT: 270},  # "A"
-    KW_LEFT: {"id": bytes("\x00L".encode("ascii")), KW_WIDTH: 60, KW_HEIGHT: 270},  # "L"
-    KW_RIGHT: {"id": bytes("\x00R".encode("ascii")), KW_WIDTH: 60, KW_HEIGHT: 270},  # "R"
+    KW_LEFT: {"id": bytes("\x00M".encode("ascii")), KW_WIDTH: 60, KW_HEIGHT: 270, KW_OFFSET: 0},  # "L"
+    KW_CENTER: {"id": bytes("\x00M".encode("ascii")), KW_WIDTH: 360, KW_HEIGHT: 270, KW_OFFSET: 60},  # "A"
+    KW_RIGHT: {"id": bytes("\x00M".encode("ascii")), KW_WIDTH: 60, KW_HEIGHT: 270, KW_OFFSET: 420},  # "R"
 }
 
 DISPLAY_NAMES = set(DISPLAYS.keys())
@@ -352,7 +353,7 @@ class LoupedeckLive(Loupedeck):
     # #########################################@
     # Callbacks
     #
-    def do_action(self, action, data: bytearray = None, track: bool = False):
+    def do_action(self, action, data: bytearray | None = None, track: bool = False):
         if not self.inited:
             logger.warning(f"do_action: not started")
             return
@@ -494,7 +495,7 @@ class LoupedeckLive(Loupedeck):
         self.do_action(HEADERS["SET_BRIGHTNESS"], brightness.to_bytes(1, BIG_ENDIAN))
         # logger.debug(f"set_brightness: sent {brightness}")
 
-    def set_button_color(self, name: str, color: tuple or str):
+    def set_button_color(self, name: str, color: tuple | str):
         keys = list(filter(lambda k: BUTTONS[k] == name, BUTTONS))
         if len(keys) != 1:
             logger.warning(f"set_button_color: invalid button key {name}")
@@ -518,12 +519,12 @@ class LoupedeckLive(Loupedeck):
 
     # Image display functions
     #
-    def refresh(self, display: int):
+    def refresh(self, display: str):
         display_info = DISPLAYS[display]
         self.do_action(HEADERS["DRAW"], display_info["id"], track=True)
         # logger.debug("refresh: refreshed")
 
-    def draw_buffer(self, buff, display: str, width: int = None, height: int = None, x: int = 0, y: int = 0, auto_refresh: bool = True):
+    def draw_buffer(self, buff, display: str, width: int | None = None, height: int | None = None, x: int = 0, y: int = 0, auto_refresh: bool = True):
         display_info = DISPLAYS[display]
         if width is None:
             width = display_info[KW_WIDTH]
@@ -546,17 +547,17 @@ class LoupedeckLive(Loupedeck):
         if auto_refresh:
             self.refresh(display)
 
-    def draw_image(self, image, display: str, width: int = None, height: int = None, x: int = 0, y: int = 0, auto_refresh: bool = True):
+    def draw_image(self, image, display: str, width: int | None = None, height: int | None = None, x: int = 0, y: int = 0, auto_refresh: bool = True):
         buff = PILHelper.to_native_format(display, image)
         self.draw_buffer(buff, display=display, width=width, height=height, x=x, y=y, auto_refresh=auto_refresh)
 
-    def draw_left_image(self, image, width: int = None, height: int = None, x: int = 0, y: int = 0, auto_refresh: bool = True):
+    def draw_left_image(self, image, width: int | None = None, height: int | None = None, x: int = 0, y: int = 0, auto_refresh: bool = True):
         self.draw_image(image=image, display="left", width=width, height=height, x=x, y=y, auto_refresh=auto_refresh)
 
-    def draw_right_image(self, image, width: int = None, height: int = None, x: int = 0, y: int = 0, auto_refresh: bool = True):
+    def draw_right_image(self, image, width: int | None = None, height: int | None = None, x: int = 0, y: int = 0, auto_refresh: bool = True):
         self.draw_image(image=image, display="right", width=width, height=height, x=x, y=y, auto_refresh=auto_refresh)
 
-    def draw_center_image(self, image, width: int = None, height: int = None, x: int = 0, y: int = 0, auto_refresh: bool = True):
+    def draw_center_image(self, image, width: int | None = None, height: int | None = None, x: int = 0, y: int = 0, auto_refresh: bool = True):
         self.draw_image(image=image, display="center", width=width, height=height, x=x, y=y, auto_refresh=auto_refresh)
 
     def draw_screen(self, image, display: str, auto_refresh: bool = True):
@@ -567,13 +568,13 @@ class LoupedeckLive(Loupedeck):
 
     def set_key_image(self, idx: str, image):
         # Get offset x/y for key index
+        x = DISPLAYS.get(idx).get(KW_OFFSET) if idx in DISPLAYS else DISPLAYS.get(KW_CENTER).get(KW_OFFSET)
+
         if idx == KW_LEFT:
             display = idx
-            x = 0
             y = 0
         elif idx == KW_RIGHT:
             display = idx
-            x = 420
             y = 0
         else:
             display = KW_CENTER
@@ -585,7 +586,7 @@ class LoupedeckLive(Loupedeck):
                 idx = int(idx)
                 width = BUTTON_SIZES[display][0]
                 height = BUTTON_SIZES[display][1]
-                x = idx % 4 * width
+                x = x + ((idx % 4) * width)
                 y = math.floor(idx / 4) * height
             except ValueError:
                 logger.warning(f"set_key_image: key «{idx_in}»: invalid index for center display, aborting set_key_image")
@@ -622,19 +623,20 @@ class LoupedeckLive(Loupedeck):
     #
     def test(self):
         WAIT_TIME = 3
-        for i in HAPTIC.keys():
-            self.vibrate(i)
-            print(i)
-            time.sleep(WAIT_TIME)
+        SHORT_WAIT = 0.4
+        # for i in HAPTIC.keys():
+        #     self.vibrate(i)
+        #     print(i)
+        #     time.sleep(WAIT_TIME)
 
         for bright in range(0, 100, 10):
-            time.sleep(0.2)
+            time.sleep(SHORT_WAIT)
             self.set_brightness(bright)
 
         for i in range(1, 7):
             self.set_button_color(f"{i}", (00, 00, 101))
             self.set_button_color(f"{i + 1}", (190, 00, 00))
-            time.sleep(WAIT_TIME)
+            time.sleep(SHORT_WAIT)
 
         self.set_button_color("1", "red")
         self.set_button_color("2", "orange")
