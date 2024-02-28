@@ -532,6 +532,9 @@ class LoupedeckLive(Loupedeck):
         # logger.debug("refresh: refreshed")
 
     def draw_buffer(self, buff, display: str, width: int | None = None, height: int | None = None, x: int = 0, y: int = 0, auto_refresh: bool = True):
+        t = DISPLAYS[display][KW_OFFSET] if display in DISPLAYS else DISPLAYS[KW_CENTER][KW_OFFSET]
+        xoffset: int = int.from_bytes(t) if type(t) is bytes else int(t)
+        x = x + xoffset
         display_info = DISPLAYS[display]
         loc_width: int = int(display_info[KW_WIDTH]) if width is None else width
         loc_height: int = int(display_info[KW_HEIGHT]) if height is None else height
@@ -572,16 +575,12 @@ class LoupedeckLive(Loupedeck):
             self.draw_image(image, display=display, auto_refresh=auto_refresh)
 
     def set_key_image(self, idx: str, image):
-        # Get offset x/y for key index
-        t = DISPLAYS[idx][KW_OFFSET] if idx in DISPLAYS else DISPLAYS[KW_CENTER][KW_OFFSET]
-        x: int = int.from_bytes(t) if type(t) is bytes else int(t)
-
+        x = 0
+        y = 0
         if idx == KW_LEFT:
             display = idx
-            y = 0
         elif idx == KW_RIGHT:
             display = idx
-            y = 0
         else:
             display = KW_CENTER
             # note: if idx==KW_CENTER, should display the whole image in center portion
@@ -592,7 +591,7 @@ class LoupedeckLive(Loupedeck):
                 loc_idx = int(idx)
                 width = BUTTON_SIZES[display][0]
                 height = BUTTON_SIZES[display][1]
-                x = x + ((loc_idx % 4) * width)
+                x = (loc_idx % 4) * width
                 y = math.floor(loc_idx / 4) * height
             except ValueError:
                 logger.warning(f"set_key_image: key «{idx_in}»: invalid index for center display, aborting set_key_image")
