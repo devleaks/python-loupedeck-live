@@ -1,11 +1,12 @@
 # Application constants
+from typing import ByteString, Literal, List
 
-BAUD_RATE = 460800
-BIG_ENDIAN = "big"
-READING_TIMEOUT = 1  # seconds
+BAUD_RATE: int = 460800
+BIG_ENDIAN: Literal["little", "big"] = "big"
+READING_TIMEOUT: int = 1  # seconds
 
 # Serial Websocket negociation (!)
-WS_UPGRADE_HEADER = b"""GET /index.html
+WS_UPGRADE_HEADER: ByteString = b"""GET /index.html
 HTTP/1.1
 Connection: Upgrade
 Upgrade: websocket
@@ -13,7 +14,7 @@ Sec-WebSocket-Key: 123abc
 
 """
 
-WS_UPGRADE_RESPONSE = [
+WS_UPGRADE_RESPONSE: List[ByteString] = [
     b"HTTP/1.1 101 Switching Protocols\r\n",
     b"Upgrade: websocket\r\n",
     b"Connection: Upgrade\r\n",

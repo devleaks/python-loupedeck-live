@@ -2,6 +2,7 @@
 Loupedeck base class. Kind of ABC for future loupedeck devices.
 """
 import logging
+from typing import Callable
 import serial
 
 from threading import RLock
@@ -19,16 +20,15 @@ NUM_ATTEMPTS = 1  # + 1 mandatory
 
 class Loupedeck:
     def __init__(self, path: str, baudrate: int = BAUD_RATE, timeout: int = READING_TIMEOUT):
-        self.path = path
+        self.path: str = path
         # See https://lucidar.me/en/serialib/most-used-baud-rates-table/ for baudrates
         self.connection = serial.Serial(port=path, baudrate=baudrate, timeout=timeout)
         logger.debug(f"__init__: connection opened")
 
-        self.serial = None
-        self.version = None
+        self.serial: str | None = None
+        self.version: str | None = None
         self.inited = False
         self.running = False
-        self.path = None
 
         self._buffer = bytearray(b"")
         self._is_loupedeck = False
@@ -36,7 +36,7 @@ class Loupedeck:
         self.pendingTransactions = [None for _ in range(256)]
         self.transaction_id = 0
 
-        self.callback = None
+        self.callback: Callable | None = None
 
         self.update_lock = RLock()
 

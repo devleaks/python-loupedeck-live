@@ -5,6 +5,7 @@ import logging
 import math
 import threading
 import time
+from typing import Dict, ByteString, Callable, Any, Tuple
 from enum import Enum
 
 from queue import Queue
@@ -12,9 +13,11 @@ from datetime import datetime
 from PIL import Image, ImageColor
 from serial import XOFF
 
-from .Loupedeck import Loupedeck
 from .constants import BAUD_RATE, READING_TIMEOUT, BIG_ENDIAN
+from .Loupedeck import Loupedeck
+from ..DeviceManager import DeviceManager
 from ..ImageHelpers import PILHelper
+
 
 logger = logging.getLogger("LoupedeckLive")
 # logger.setLevel(logging.DEBUG)
@@ -24,7 +27,7 @@ DEVICE_MODEL = "Loupedeck Live"  # verbose descriptive
 DEVICE_MODEL_NAME = "loupedecklive"  # technical alias, as returned in definitions
 
 # Actions and response identifications
-HEADERS = {
+HEADERS: Dict[str, int] = {
     "CONFIRM": 0x0302,
     "SERIAL_OUT": 0x0303,
     "VERSION_OUT": 0x0307,
@@ -46,7 +49,7 @@ HEADERS = {
 }
 
 # Button names
-BUTTONS = {
+BUTTONS: Dict[int, str] = {
     0x01: "knobTL",
     0x02: "knobCL",
     0x03: "knobBL",
@@ -64,6 +67,7 @@ BUTTONS = {
 }
 
 # Displays
+KW_ID = "id"
 KW_LEFT = "left"
 KW_RIGHT = "right"
 KW_CENTER = "center"
@@ -72,10 +76,10 @@ KW_HEIGHT = "height"
 KW_CIRCLE = "circle"
 KW_OFFSET = "offset"
 
-DISPLAYS = {
-    KW_LEFT: {"id": bytes("\x00M".encode("ascii")), KW_WIDTH: 60, KW_HEIGHT: 270, KW_OFFSET: 0},  # "L"
-    KW_CENTER: {"id": bytes("\x00M".encode("ascii")), KW_WIDTH: 360, KW_HEIGHT: 270, KW_OFFSET: 60},  # "A"
-    KW_RIGHT: {"id": bytes("\x00M".encode("ascii")), KW_WIDTH: 60, KW_HEIGHT: 270, KW_OFFSET: 420},  # "R"
+DISPLAYS: Dict[str, Dict[str, int | bytes]] = {
+    KW_LEFT: {KW_ID: bytes("\x00M".encode("ascii")), KW_WIDTH: 60, KW_HEIGHT: 270, KW_OFFSET: 0},  # "L"
+    KW_CENTER: {KW_ID: bytes("\x00M".encode("ascii")), KW_WIDTH: 360, KW_HEIGHT: 270, KW_OFFSET: 60},  # "A"
+    KW_RIGHT: {KW_ID: bytes("\x00M".encode("ascii")), KW_WIDTH: 60, KW_HEIGHT: 270, KW_OFFSET: 420},  # "R"
 }
 
 DISPLAY_NAMES = set(DISPLAYS.keys())
@@ -150,7 +154,7 @@ class LoupedeckLive(Loupedeck):
         self.reading_finished = None
         self.process_finished = None
         self.get_serial = None
-        self.touches = {}
+        self.touches: Dict[int, Dict] = {}
 
         self.handlers = {
             HEADERS["BUTTON_PRESS"]: self.on_button,
@@ -162,7 +166,7 @@ class LoupedeckLive(Loupedeck):
             HEADERS["VERSION_IN"]: self.on_version,
         }
 
-        self._messages = Queue()
+        self._messages: Queue = Queue()
         self.get_timeout = 1  # Queue get() timeout, in seconds
 
         if not self.is_loupedeck():
@@ -353,7 +357,7 @@ class LoupedeckLive(Loupedeck):
     # #########################################@
     # Callbacks
     #
-    def do_action(self, action, data: bytearray | None = None, track: bool = False):
+    def do_action(self, action, data: Any | None = None, track: bool = False):
         if not self.inited:
             logger.warning(f"do_action: not started")
             return
@@ -468,7 +472,7 @@ class LoupedeckLive(Loupedeck):
         # logger.debug(f"on_default_callback: {transaction_id}: {response}")
         self.pendingTransactions[transaction_id] = None
 
-    def set_callback(self, callback: callable):
+    def set_callback(self, callback: Callable):
         """
         This is the user's callback called when action
         occurred on the Loupedeck device
@@ -495,7 +499,7 @@ class LoupedeckLive(Loupedeck):
         self.do_action(HEADERS["SET_BRIGHTNESS"], brightness.to_bytes(1, BIG_ENDIAN))
         # logger.debug(f"set_brightness: sent {brightness}")
 
-    def set_button_color(self, name: str, color: tuple | str):
+    def set_button_color(self, name: str, color: Tuple[int, int, int] | str):
         keys = list(filter(lambda k: BUTTONS[k] == name, BUTTONS))
         if len(keys) != 1:
             logger.warning(f"set_button_color: invalid button key {name}")
@@ -503,9 +507,13 @@ class LoupedeckLive(Loupedeck):
         key = keys[0]
 
         if type(color) is str:
-            (r, g, b) = ImageColor.getrgb(color)
+            temp = ImageColor.getrgb(color)
+            if len(temp) == 3:
+                (r, g, b) = temp
+            else:
+                (r, g, b, a) = temp
         else:
-            (r, g, b) = color
+            (r, g, b) = color  # type: ignore
         data = bytearray([key, r, g, b])
         self.do_action(HEADERS["SET_COLOR"], data)
         # logger.debug(f"set_button_color: sent {name}, {color}")
@@ -521,16 +529,14 @@ class LoupedeckLive(Loupedeck):
     #
     def refresh(self, display: str):
         display_info = DISPLAYS[display]
-        self.do_action(HEADERS["DRAW"], display_info["id"], track=True)
+        self.do_action(HEADERS["DRAW"], display_info[KW_ID], track=True)
         # logger.debug("refresh: refreshed")
 
     def draw_buffer(self, buff, display: str, width: int | None = None, height: int | None = None, x: int = 0, y: int = 0, auto_refresh: bool = True):
         display_info = DISPLAYS[display]
-        if width is None:
-            width = display_info[KW_WIDTH]
-        if height is None:
-            height = display_info[KW_HEIGHT]
-        expected = width * height * 2
+        loc_width: int = int(display_info[KW_WIDTH]) if width is None else width
+        loc_height: int = int(display_info[KW_HEIGHT]) if height is None else height
+        expected: int = loc_width * loc_height * 2
         if len(buff) != expected:
             logger.error(f"draw_buffer: invalid buffer {len(buff)}, expected={expected}")
             return  # don't do anything because it breaks the connection to send invalid length buffer
@@ -539,9 +545,9 @@ class LoupedeckLive(Loupedeck):
 
         header = x.to_bytes(2, BIG_ENDIAN)
         header = header + y.to_bytes(2, BIG_ENDIAN)
-        header = header + width.to_bytes(2, BIG_ENDIAN)
-        header = header + height.to_bytes(2, BIG_ENDIAN)
-        payload = display_info["id"] + header + buff
+        header = header + loc_width.to_bytes(2, BIG_ENDIAN)
+        header = header + loc_height.to_bytes(2, BIG_ENDIAN)
+        payload = display_info[KW_ID] + header + buff  # type: ignore
         self.do_action(HEADERS["WRITE_FRAMEBUFF"], payload, track=True)
         # logger.debug(f"draw_buffer: buffer sent {len(buff)} bytes")
         if auto_refresh:
@@ -568,7 +574,8 @@ class LoupedeckLive(Loupedeck):
 
     def set_key_image(self, idx: str, image):
         # Get offset x/y for key index
-        x = DISPLAYS.get(idx).get(KW_OFFSET) if idx in DISPLAYS else DISPLAYS.get(KW_CENTER).get(KW_OFFSET)
+        t = DISPLAYS[idx][KW_OFFSET] if idx in DISPLAYS else DISPLAYS[KW_CENTER][KW_OFFSET]
+        x: int = int.from_bytes(t) if type(t) is bytes else int(t)
 
         if idx == KW_LEFT:
             display = idx
@@ -583,11 +590,11 @@ class LoupedeckLive(Loupedeck):
             # else, idx must be a number 0..11
             idx_in = idx
             try:
-                idx = int(idx)
+                loc_idx = int(idx)
                 width = BUTTON_SIZES[display][0]
                 height = BUTTON_SIZES[display][1]
-                x = x + ((idx % 4) * width)
-                y = math.floor(idx / 4) * height
+                x = x + ((loc_idx % 4) * width)
+                y = math.floor(loc_idx / 4) * height
             except ValueError:
                 logger.warning(f"set_key_image: key «{idx_in}»: invalid index for center display, aborting set_key_image")
                 return
@@ -664,7 +671,7 @@ class LoupedeckLive(Loupedeck):
 
 if __name__ == "__main__":
     logging.basicConfig(level=logging.INFO)
-    devices = LoupedeckLive.list()
+    devices = DeviceManager.list()
 
     def callback(msg):
         print(f"received {msg}")
