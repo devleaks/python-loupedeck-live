@@ -15,7 +15,6 @@ from serial import XOFF
 
 from .constants import BAUD_RATE, READING_TIMEOUT, BIG_ENDIAN
 from .Loupedeck import Loupedeck
-from ..DeviceManager import DeviceManager
 from ..ImageHelpers import PILHelper
 
 
@@ -670,6 +669,8 @@ class LoupedeckLive(Loupedeck):
 
 
 if __name__ == "__main__":
+    from ..DeviceManager import DeviceManager
+
     logging.basicConfig(level=logging.INFO)
     devices = DeviceManager.list()
 
