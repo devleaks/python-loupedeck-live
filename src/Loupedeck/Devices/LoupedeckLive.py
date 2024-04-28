@@ -1,6 +1,7 @@
 """
 Main Loupedeck and LoupedeckLive classes.
 """
+
 import logging
 import math
 import threading
@@ -14,7 +15,7 @@ from PIL import Image, ImageColor
 from serial import XOFF
 
 from .constants import BAUD_RATE, READING_TIMEOUT, BIG_ENDIAN
-from .Loupedeck import Loupedeck
+from .Loupedeck import UNKNOWN_DEVICE, Loupedeck
 from ..ImageHelpers import PILHelper
 
 
@@ -76,9 +77,24 @@ KW_CIRCLE = "circle"
 KW_OFFSET = "offset"
 
 DISPLAYS: Dict[str, Dict[str, int | bytes]] = {
-    KW_LEFT: {KW_ID: bytes("\x00M".encode("ascii")), KW_WIDTH: 60, KW_HEIGHT: 270, KW_OFFSET: 0},  # "L"
-    KW_CENTER: {KW_ID: bytes("\x00M".encode("ascii")), KW_WIDTH: 360, KW_HEIGHT: 270, KW_OFFSET: 60},  # "A"
-    KW_RIGHT: {KW_ID: bytes("\x00M".encode("ascii")), KW_WIDTH: 60, KW_HEIGHT: 270, KW_OFFSET: 420},  # "R"
+    KW_LEFT: {
+        KW_ID: bytes("\x00M".encode("ascii")),
+        KW_WIDTH: 60,
+        KW_HEIGHT: 270,
+        KW_OFFSET: 0,
+    },  # "L"
+    KW_CENTER: {
+        KW_ID: bytes("\x00M".encode("ascii")),
+        KW_WIDTH: 360,
+        KW_HEIGHT: 270,
+        KW_OFFSET: 60,
+    },  # "A"
+    KW_RIGHT: {
+        KW_ID: bytes("\x00M".encode("ascii")),
+        KW_WIDTH: 60,
+        KW_HEIGHT: 270,
+        KW_OFFSET: 420,
+    },  # "R"
 }
 
 DISPLAY_NAMES = set(DISPLAYS.keys())
@@ -142,7 +158,15 @@ MAX_TRANSACTIONS = 256
 
 
 class LoupedeckLive(Loupedeck):
-    def __init__(self, path: str, baudrate: int = BAUD_RATE, timeout: int = READING_TIMEOUT, auto_start: bool = True):
+    DECK_TYPE = "LoupedeckLive"
+
+    def __init__(
+        self,
+        path: str,
+        baudrate: int = BAUD_RATE,
+        timeout: int = READING_TIMEOUT,
+        auto_start: bool = True,
+    ):
         Loupedeck.__init__(self, path=path, baudrate=baudrate, timeout=timeout)
 
         self.auto_start = auto_start
@@ -175,7 +199,7 @@ class LoupedeckLive(Loupedeck):
 
     def deck_type(self):
         if self.inited:
-            return DEVICE_MODEL_NAME if self._is_loupedeck else "unknown"
+            return LoupedeckLive.DECK_TYPE if self._is_loupedeck else UNKNOWN_DEVICE
 
     def open(self):
         pass
@@ -242,17 +266,23 @@ class LoupedeckLive(Loupedeck):
                 #  We need to at least be able to read the length byte
                 if len(self._buffer) < position + 2:
                     if trace:
-                        logger.debug(f"magic: not enough bytes ({len(self._buffer)}), waiting for more")
+                        logger.debug(
+                            f"magic: not enough bytes ({len(self._buffer)}), waiting for more"
+                        )
                     break
                 nextLength = self._buffer[position + 1]
                 #  Make sure we have enough bytes to meet self length
                 expectedEnd = position + nextLength + 2
                 if len(self._buffer) < expectedEnd:
                     if trace:
-                        logger.debug(f"magic: not enough bytes for message ({len(self._buffer)}, exp={expectedEnd}), waiting for more")
+                        logger.debug(
+                            f"magic: not enough bytes for message ({len(self._buffer)}, exp={expectedEnd}), waiting for more"
+                        )
                     break
                 if trace:
-                    logger.debug(f"magic: message from {position + 2} to {expectedEnd} (len={nextLength}), enqueueing ({self._messages.qsize()})")
+                    logger.debug(
+                        f"magic: message from {position + 2} to {expectedEnd} (len={nextLength}), enqueueing ({self._messages.qsize()})"
+                    )
                 self._messages.put(self._buffer[position + 2 : expectedEnd])
                 self._buffer = self._buffer[expectedEnd:]
                 position = self._buffer.find(magicByte)
@@ -289,7 +319,11 @@ class LoupedeckLive(Loupedeck):
                     transaction_id = buff[2]
                     # logger.debug(f"_process_messages: transaction_id {transaction_id}, header {header:x}")
                     response = handler(buff[3:]) if handler is not None else buff
-                    resolver = self.pendingTransactions[transaction_id] if transaction_id in self.pendingTransactions else None
+                    resolver = (
+                        self.pendingTransactions[transaction_id]
+                        if transaction_id in self.pendingTransactions
+                        else None
+                    )
                     if resolver is not None:
                         resolver(transaction_id, response)
                     else:
@@ -367,9 +401,13 @@ class LoupedeckLive(Loupedeck):
 
         # logger.debug(f"do_action: {action:04x}, {print_bytes(data)}")
         self.transaction_id = (self.transaction_id + 1) % MAX_TRANSACTIONS
-        if self.transaction_id == 0:  # Skip transaction ID's of zero since the device seems to ignore them
+        if (
+            self.transaction_id == 0
+        ):  # Skip transaction ID's of zero since the device seems to ignore them
             self.transaction_id = self.transaction_id + 1
-        header = action.to_bytes(2, BIG_ENDIAN) + self.transaction_id.to_bytes(1, BIG_ENDIAN)
+        header = action.to_bytes(2, BIG_ENDIAN) + self.transaction_id.to_bytes(
+            1, BIG_ENDIAN
+        )
         # logger.debug(f"do_action: id={self.transaction_id}, header={header}, track={track}")
         payload = header
         if data is not None:
@@ -531,8 +569,21 @@ class LoupedeckLive(Loupedeck):
         self.do_action(HEADERS["DRAW"], display_info[KW_ID], track=True)
         # logger.debug("refresh: refreshed")
 
-    def draw_buffer(self, buff, display: str, width: int | None = None, height: int | None = None, x: int = 0, y: int = 0, auto_refresh: bool = True):
-        t = DISPLAYS[display][KW_OFFSET] if display in DISPLAYS else DISPLAYS[KW_CENTER][KW_OFFSET]
+    def draw_buffer(
+        self,
+        buff,
+        display: str,
+        width: int | None = None,
+        height: int | None = None,
+        x: int = 0,
+        y: int = 0,
+        auto_refresh: bool = True,
+    ):
+        t = (
+            DISPLAYS[display][KW_OFFSET]
+            if display in DISPLAYS
+            else DISPLAYS[KW_CENTER][KW_OFFSET]
+        )
         xoffset: int = int.from_bytes(t) if type(t) is bytes else int(t)
         x = x + xoffset
         display_info = DISPLAYS[display]
@@ -540,7 +591,9 @@ class LoupedeckLive(Loupedeck):
         loc_height: int = int(display_info[KW_HEIGHT]) if height is None else height
         expected: int = loc_width * loc_height * 2
         if len(buff) != expected:
-            logger.error(f"draw_buffer: invalid buffer {len(buff)}, expected={expected}")
+            logger.error(
+                f"draw_buffer: display {display}: invalid buffer {len(buff)}, expected={expected}"
+            )
             return  # don't do anything because it breaks the connection to send invalid length buffer
 
         # logger.debug(f"draw_buffer: o={x},{y}, dim={width},{height}")
@@ -555,18 +608,83 @@ class LoupedeckLive(Loupedeck):
         if auto_refresh:
             self.refresh(display)
 
-    def draw_image(self, image, display: str, width: int | None = None, height: int | None = None, x: int = 0, y: int = 0, auto_refresh: bool = True):
+    def draw_image(
+        self,
+        image,
+        display: str,
+        width: int | None = None,
+        height: int | None = None,
+        x: int = 0,
+        y: int = 0,
+        auto_refresh: bool = True,
+    ):
         buff = PILHelper.to_native_format(display, image)
-        self.draw_buffer(buff, display=display, width=width, height=height, x=x, y=y, auto_refresh=auto_refresh)
+        self.draw_buffer(
+            buff,
+            display=display,
+            width=width,
+            height=height,
+            x=x,
+            y=y,
+            auto_refresh=auto_refresh,
+        )
 
-    def draw_left_image(self, image, width: int | None = None, height: int | None = None, x: int = 0, y: int = 0, auto_refresh: bool = True):
-        self.draw_image(image=image, display="left", width=width, height=height, x=x, y=y, auto_refresh=auto_refresh)
+    def draw_left_image(
+        self,
+        image,
+        width: int | None = None,
+        height: int | None = None,
+        x: int = 0,
+        y: int = 0,
+        auto_refresh: bool = True,
+    ):
+        self.draw_image(
+            image=image,
+            display="left",
+            width=width,
+            height=height,
+            x=x,
+            y=y,
+            auto_refresh=auto_refresh,
+        )
 
-    def draw_right_image(self, image, width: int | None = None, height: int | None = None, x: int = 0, y: int = 0, auto_refresh: bool = True):
-        self.draw_image(image=image, display="right", width=width, height=height, x=x, y=y, auto_refresh=auto_refresh)
+    def draw_right_image(
+        self,
+        image,
+        width: int | None = None,
+        height: int | None = None,
+        x: int = 0,
+        y: int = 0,
+        auto_refresh: bool = True,
+    ):
+        self.draw_image(
+            image=image,
+            display="right",
+            width=width,
+            height=height,
+            x=x,
+            y=y,
+            auto_refresh=auto_refresh,
+        )
 
-    def draw_center_image(self, image, width: int | None = None, height: int | None = None, x: int = 0, y: int = 0, auto_refresh: bool = True):
-        self.draw_image(image=image, display="center", width=width, height=height, x=x, y=y, auto_refresh=auto_refresh)
+    def draw_center_image(
+        self,
+        image,
+        width: int | None = None,
+        height: int | None = None,
+        x: int = 0,
+        y: int = 0,
+        auto_refresh: bool = True,
+    ):
+        self.draw_image(
+            image=image,
+            display="center",
+            width=width,
+            height=height,
+            x=x,
+            y=y,
+            auto_refresh=auto_refresh,
+        )
 
     def draw_screen(self, image, display: str, auto_refresh: bool = True):
         if type(image) == bytearray:
@@ -594,7 +712,9 @@ class LoupedeckLive(Loupedeck):
                 x = (loc_idx % 4) * width
                 y = math.floor(loc_idx / 4) * height
             except ValueError:
-                logger.warning(f"set_key_image: key «{idx_in}»: invalid index for center display, aborting set_key_image")
+                logger.warning(
+                    f"set_key_image: key «{idx_in}»: invalid index for center display, aborting set_key_image"
+                )
                 return
 
         width = BUTTON_SIZES[display][0]
@@ -602,9 +722,25 @@ class LoupedeckLive(Loupedeck):
         # logger.info(f"set_key_image: key {idx}: {x}, {y}, {width}, {height}")
 
         if type(image) == bytearray:
-            self.draw_buffer(image, display=display, width=width, height=height, x=x, y=y, auto_refresh=True)
+            self.draw_buffer(
+                image,
+                display=display,
+                width=width,
+                height=height,
+                x=x,
+                y=y,
+                auto_refresh=True,
+            )
         else:  # type(image) == PIL.Image.Image
-            self.draw_image(image, display=display, width=width, height=height, x=x, y=y, auto_refresh=True)
+            self.draw_image(
+                image,
+                display=display,
+                width=width,
+                height=height,
+                x=x,
+                y=y,
+                auto_refresh=True,
+            )
 
     def set_left_image(self, image):
         self.set_key_image(KW_LEFT, image)

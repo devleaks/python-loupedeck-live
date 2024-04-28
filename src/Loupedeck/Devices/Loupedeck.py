@@ -1,25 +1,36 @@
 """
 Loupedeck base class. Kind of ABC for future loupedeck devices.
 """
+
 import logging
 from typing import Callable
 import serial
 
 from threading import RLock
 
-from .constants import BAUD_RATE, READING_TIMEOUT, BIG_ENDIAN, WS_UPGRADE_HEADER, WS_UPGRADE_RESPONSE
+from .constants import (
+    BAUD_RATE,
+    READING_TIMEOUT,
+    BIG_ENDIAN,
+    WS_UPGRADE_HEADER,
+    WS_UPGRADE_RESPONSE,
+)
 
 logger = logging.getLogger("Loupedeck")
 # logger.setLevel(logging.DEBUG)
 
 
 DEVICE_MANUFACTURER = "Loupedeck"  # verbose descriptive
-
+UNKNOWN_DEVICE = "unknown"
 NUM_ATTEMPTS = 1  # + 1 mandatory
 
 
 class Loupedeck:
-    def __init__(self, path: str, baudrate: int = BAUD_RATE, timeout: int = READING_TIMEOUT):
+    DECK_TYPE = "Loupedeck"
+
+    def __init__(
+        self, path: str, baudrate: int = BAUD_RATE, timeout: int = READING_TIMEOUT
+    ):
         self.path: str = path
         # See https://lucidar.me/en/serialib/most-used-baud-rates-table/ for baudrates
         self.connection = serial.Serial(port=path, baudrate=baudrate, timeout=timeout)
@@ -72,7 +83,7 @@ class Loupedeck:
 
     def deck_type(self):
         if self.inited:
-            return "loupedeck" if self._is_loupedeck else "unknown"
+            return Loupedeck.DECK_TYPE if self._is_loupedeck else UNKNOWN_DEVICE
 
     def is_loupedeck(self) -> bool:
         global NUM_ATTEMPTS
@@ -95,10 +106,14 @@ class Loupedeck:
             if raw_byte == b"":
                 cnt = cnt + 1
             if cnt > NUM_ATTEMPTS:
-                logger.debug(f"is_loupedeck: {self.path}: ..got {cnt} wrong answers, probably not a {type(self).__name__} device, ignoring.")
+                logger.debug(
+                    f"is_loupedeck: {self.path}: ..got {cnt} wrong answers, probably not a {type(self).__name__} device, ignoring."
+                )
                 self.inited = True
         if good == len(WS_UPGRADE_RESPONSE):  # not 100% correct, but ok.
-            logger.debug(f"is_loupedeck: {self.path}: ..got a {type(self).__name__} device")
+            logger.debug(
+                f"is_loupedeck: {self.path}: ..got a {type(self).__name__} device"
+            )
             self.inited = True
             self._is_loupedeck = True
 

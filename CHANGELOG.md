@@ -1,6 +1,8 @@
 CHANGELOGS
 ==========
 
+  - 1.4.4: More normalization of names and behavior
+  - 1.4.3: Cleanup DECK_TYPE names
   - 1.4.2: Moved x offset to draw_buffer
   - 1.4.1: Corrected types for mypy
   - 1.4.0: I do not remember...
