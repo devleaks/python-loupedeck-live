@@ -67,6 +67,7 @@ BUTTONS: Dict[int, str] = {
 }
 
 # Displays
+KW_KNOB = "knob"
 KW_ID = "id"
 KW_LEFT = "left"
 KW_RIGHT = "right"

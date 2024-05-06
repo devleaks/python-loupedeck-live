@@ -1,6 +1,7 @@
 CHANGELOGS
 ==========
 
+  - 1.4.5: Added knob keyword to spot encoders through their name
   - 1.4.4: More normalization of names and behavior
   - 1.4.3: Cleanup DECK_TYPE names
   - 1.4.2: Moved x offset to draw_buffer
