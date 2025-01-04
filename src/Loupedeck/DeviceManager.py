@@ -25,7 +25,7 @@ class DeviceManager:
             ports = [f"COM{i}" for i in range(1, 256)]
         elif sys.platform.startswith("linux") or sys.platform.startswith("cygwin"):
             # this excludes your current terminal "/dev/tty"
-            ports = glob.glob("/dev/tty[A-Za-z]*")
+            ports = glob.glob("/dev/tty[A-Za-z0-9]*")
         elif sys.platform.startswith("darwin"):
             ports = glob.glob("/dev/tty.*")
         else:
