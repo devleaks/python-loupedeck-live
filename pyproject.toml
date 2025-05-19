@@ -21,7 +21,7 @@ packages = ["src/Loupedeck"]
 # Project
 #
 [project]
-name = "python-loupedeck-live"
+name = "loupedeck"
 
 authors = [
   { name="Pierre M.", email="pierre@devleaks.be" }
