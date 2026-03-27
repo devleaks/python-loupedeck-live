@@ -4,11 +4,16 @@ Main Loupedeck and LoupedeckLive classes.
 import glob
 import logging
 import serial
+import serial.tools.list_ports
 import sys
 from .Devices import LoupedeckLive
 
 logger = logging.getLogger("DeviceManager")
 VERBOSE = False
+
+# Loupedeck USB vendor ID; used to pre-filter ports before probing.
+LOUPEDECK_VID = 0x2EC2
+
 
 class DeviceManager:
 
@@ -21,6 +26,27 @@ class DeviceManager:
             :returns:
                 A list of the serial ports available on the system
         """
+        # Fast path: use pyserial's cross-platform port enumerator which carries
+        # USB VID/PID metadata.  Filtering by Loupedeck's vendor ID avoids
+        # opening unrelated ports (Bluetooth, MIDI, etc.) and, critically,
+        # prevents the is_loupedeck() probe from being run against devices that
+        # continuously emit binary data — which would previously cause an
+        # infinite hang on macOS composite USB devices.
+        try:
+            vid_filtered = [
+                p.device
+                for p in serial.tools.list_ports.comports()
+                if p.vid == LOUPEDECK_VID
+            ]
+            if vid_filtered:
+                logger.debug(f"list: VID filter found {len(vid_filtered)} Loupedeck-VID port(s): {vid_filtered}")
+                return vid_filtered
+            logger.debug("list: VID filter found no Loupedeck-VID ports; falling back to full scan")
+        except Exception as exc:
+            logger.warning(f"list: VID/PID port scan failed ({exc}); falling back to full scan")
+
+        # Fallback: original glob-based scan for platforms where pyserial's
+        # list_ports does not return VID metadata.
         if sys.platform.startswith("win"):
             ports = [f"COM{i}" for i in range(1, 256)]
         elif sys.platform.startswith("linux") or sys.platform.startswith("cygwin"):

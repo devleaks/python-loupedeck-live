@@ -100,14 +100,20 @@ class Loupedeck:
         logger.debug(f"is_loupedeck: {self.path}: trying..")
         while not self.inited and good < len(WS_UPGRADE_RESPONSE):
             raw_byte = self.connection.readline()
-            logger.debug(f"is_loupedeck: {raw_byte}")
-            if raw_byte in WS_UPGRADE_RESPONSE:  # got entire WS_UPGRADE_RESPONSE
+            logger.debug(f"is_loupedeck: {self.path}: read {len(raw_byte)} bytes: {raw_byte!r}")
+            if raw_byte in WS_UPGRADE_RESPONSE:  # got one expected WS upgrade line
                 good = good + 1
-            if raw_byte == b"":
+                logger.debug(f"is_loupedeck: {self.path}: good={good}/{len(WS_UPGRADE_RESPONSE)}")
+            else:
+                # Count ANY non-matching response (empty timeout or unexpected data).
+                # Previously only b"" was counted, causing an infinite loop when
+                # a port continuously emits non-matching binary data (e.g. MIDI,
+                # wrong interface, or device in unexpected state on macOS).
                 cnt = cnt + 1
+                logger.debug(f"is_loupedeck: {self.path}: non-matching response #{cnt} (max={NUM_ATTEMPTS + 1})")
             if cnt > NUM_ATTEMPTS:
                 logger.debug(
-                    f"is_loupedeck: {self.path}: ..got {cnt} wrong answers, probably not a {type(self).__name__} device, ignoring."
+                    f"is_loupedeck: {self.path}: ..got {cnt} non-matching responses, probably not a {type(self).__name__} device, ignoring."
                 )
                 self.inited = True
         if good == len(WS_UPGRADE_RESPONSE):  # not 100% correct, but ok.
